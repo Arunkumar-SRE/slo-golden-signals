@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+.venv/
+*.pyc
+.env
+
+# React
+node_modules/
+build/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Zip files
+*.zip
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+.env
+
+# React
+node_modules/
+build/
+
+# Word temp files
+~$*
+
+# Zip files
+*.zip
+
+# Word docs
+*.docx
+
+# Other
+.DS_Store
+Thumbs.db
