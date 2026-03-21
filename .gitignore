@@ -40,3 +40,27 @@ build/
 # Other
 .DS_Store
 Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+
+# React
+node_modules/
+build/
+
+# Zip files
+*.zip
+
+# Word temp files
+~$*
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
