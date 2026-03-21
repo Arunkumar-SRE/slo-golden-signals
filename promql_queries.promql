@@ -1,0 +1,221 @@
+# PromQL Queries — SLO Golden Signals Dashboard
+# All queries used in the Grafana dashboard with explanations
+# Job: ecommerce-checkout | Metrics from: demo_app.py
+
+# ============================================================
+# SIGNAL 1 — AVAILABILITY
+# ============================================================
+
+# --- Total Requests (last 5 minutes) ---
+sum(increase(http_requests_total{job="ecommerce-checkout"}[5m]))
+
+# Plain English:
+#   increase()  = how much the counter grew in the time window
+#   [5m]        = over the last 5 minutes
+#   sum()       = add up across all endpoints and labels
+#   Result      = total number of requests in last 5 minutes
+
+
+# --- Failed Requests (last 5 minutes) ---
+sum(increase(http_requests_total{job="ecommerce-checkout", status="500"}[5m]))
+
+# Plain English:
+#   status="500"  = filter only failed (HTTP 500) requests
+#   increase([5m])= how many failures in last 5 minutes
+#   Result        = total failed requests in last 5 minutes
+
+
+# --- Availability % (current) ---
+sum(rate(http_requests_total{job="ecommerce-checkout", status="200"}[5m]))
+/
+sum(rate(http_requests_total{job="ecommerce-checkout"}[5m]))
+* 100
+
+# Plain English:
+#   rate()        = requests per second (smooth average)
+#   numerator     = successful (200) requests per second
+#   denominator   = all requests per second
+#   divide        = success ratio (0 to 1)
+#   x 100         = convert to percentage
+#   Result        = e.g. 99.85%
+
+
+# --- Availability % over time (for line chart) ---
+sum(rate(http_requests_total{job="ecommerce-checkout", status="200"}[5m]))
+/
+sum(rate(http_requests_total{job="ecommerce-checkout"}[5m]))
+* 100
+
+# Same query as above — Grafana plots this over the selected time range
+
+
+# --- SLO Target Line (flat reference line at 99.9%) ---
+99.9
+
+# Plain English:
+#   Just a constant number
+#   Grafana draws this as a flat red dashed line on the chart
+#   Visual indicator of where your SLO target is
+
+
+# ============================================================
+# SIGNAL 2 — ERROR RATE
+# ============================================================
+
+# --- Error Rate % over time ---
+sum(rate(http_requests_total{job="ecommerce-checkout", status="500"}[5m]))
+/
+sum(rate(http_requests_total{job="ecommerce-checkout"}[5m]))
+* 100
+
+# Plain English:
+#   numerator     = failed requests per second
+#   denominator   = all requests per second
+#   x 100         = percentage
+#   Result        = e.g. 1.53% error rate
+
+
+# --- SLO Limit Line (flat reference at 0.1%) ---
+0.1
+
+# Plain English:
+#   Your SLO says error rate must stay BELOW 0.1%
+#   This draws a red dashed line at 0.1% on the chart
+#   When error rate crosses this line = SLO breach
+
+
+# --- Burn Rate (1 hour window) ---
+(
+  sum(rate(http_requests_total{job="ecommerce-checkout", status="500"}[1h]))
+  /
+  sum(rate(http_requests_total{job="ecommerce-checkout"}[1h]))
+)
+/ 0.001
+
+# Plain English:
+#   numerator     = actual error rate over 1 hour
+#   denominator   = 0.001 = your SLO error budget (0.1% = 0.001)
+#   divide        = how many times faster than allowed
+#   Result        = burn rate multiplier e.g. 4.5x
+#
+# Formula:   Burn Rate = actual_error_rate / error_budget_rate
+#   If burn rate = 1   → consuming exactly at expected pace
+#   If burn rate = 4.5 → consuming 4.5x faster than allowed
+
+
+# ============================================================
+# SIGNAL 3 — LATENCY
+# ============================================================
+
+# --- p50 Latency (median) ---
+histogram_quantile(
+  0.50,
+  sum(rate(http_request_duration_seconds_bucket{job="ecommerce-checkout"}[5m])) by (le)
+)
+
+# Plain English:
+#   histogram_quantile = calculates percentile from a histogram
+#   0.50              = 50th percentile (median)
+#   _bucket           = Prometheus histogram metric (has le label)
+#   by (le)           = group by "less than or equal" bucket boundaries
+#   rate([5m])        = per-second rate of each bucket
+#   Result            = 50% of requests finish under this time (seconds)
+
+
+# --- p95 Latency ---
+histogram_quantile(
+  0.95,
+  sum(rate(http_request_duration_seconds_bucket{job="ecommerce-checkout"}[5m])) by (le)
+)
+
+# Plain English:
+#   0.95   = 95th percentile
+#   Result = 95% of requests finish under this time
+#   This is the most common SLO latency target
+
+
+# --- p99 Latency ---
+histogram_quantile(
+  0.99,
+  sum(rate(http_request_duration_seconds_bucket{job="ecommerce-checkout"}[5m])) by (le)
+)
+
+# Plain English:
+#   0.99   = 99th percentile
+#   Result = 99% of requests finish under this time
+#   This catches the "tail latency" — worst case requests
+
+
+# --- % of Requests Under 200ms (Latency SLI) ---
+sum(rate(http_request_duration_seconds_bucket{job="ecommerce-checkout", le="0.2"}[5m]))
+/
+sum(rate(http_request_duration_seconds_count{job="ecommerce-checkout"}[5m]))
+* 100
+
+# Plain English:
+#   le="0.2"          = bucket for requests under 0.2 seconds (200ms)
+#   _count            = total count of all requests
+#   numerator         = requests that completed under 200ms per second
+#   denominator       = all requests per second
+#   x 100             = percentage
+#   Result            = e.g. 95.2% of requests under 200ms
+
+
+# --- SLO Threshold Line at 200ms ---
+0.2
+
+# Plain English:
+#   200ms = 0.2 seconds
+#   Flat reference line on the latency chart
+
+
+# ============================================================
+# SIGNAL 4 — SATURATION
+# ============================================================
+
+# --- Current CPU Utilization ---
+avg(cpu_utilization_percent{job="ecommerce-checkout"})
+
+# Plain English:
+#   avg()                    = average across all instances
+#   cpu_utilization_percent  = custom metric from demo_app.py
+#   Result                   = e.g. 72.4%
+
+
+# --- CPU Headroom Remaining ---
+80 - avg(cpu_utilization_percent{job="ecommerce-checkout"})
+
+# Plain English:
+#   80   = your SLO target (CPU must stay below 80%)
+#   minus current CPU
+#   Result = how much room you have before breaching SLO
+#   e.g. 80 - 72 = 8% headroom remaining
+
+
+# --- SLO Limit Line at 80% ---
+80
+
+# Plain English:
+#   Flat red dashed line at 80%
+#   When CPU crosses this = saturation SLO breach
+
+
+# ============================================================
+# REQUEST RATE (bonus panel)
+# ============================================================
+
+# --- Successful Requests per Second ---
+sum(rate(http_requests_total{job="ecommerce-checkout", status="200"}[1m]))
+
+# Plain English:
+#   rate([1m])  = per-second average over last 1 minute
+#   status="200"= only successful requests
+#   Result      = e.g. 150 req/sec
+
+
+# --- Failed Requests per Second ---
+sum(rate(http_requests_total{job="ecommerce-checkout", status="500"}[1m]))
+
+# Plain English:
+#   Same but for failed (500) requests
+#   Result = e.g. 2.3 failed req/sec
