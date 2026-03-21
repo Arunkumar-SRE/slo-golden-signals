@@ -1,3 +1,6 @@
+![CI](https://github.com/Arunkumar-SRE/slo-golden-signals/actions/workflows/ci.yml/badge.svg)
+
+
 # SLO Golden Signals Dashboard
 
 A full-stack SRE tool to calculate and visualize SLOs based on Google's 4 Golden Signals.
