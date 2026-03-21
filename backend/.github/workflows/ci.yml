@@ -1,0 +1,32 @@
+name: SLO Dashboard CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  test-backend:
+    name: Test FastAPI Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install fastapi uvicorn pydantic httpx prometheus-client pytest
+
+      - name: Run SLO tests
+        run: |
+          cd backend
+          python -m pytest test_slo.py -v
